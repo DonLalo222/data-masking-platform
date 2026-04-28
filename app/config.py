@@ -13,3 +13,6 @@ DEFAULT_SCORE_THRESHOLD: float = float(os.getenv("DEFAULT_SCORE_THRESHOLD", "0.5
 
 # Enable/disable Spanish clinical recognizers (ISO/CIE-10/HL7)
 ENABLE_CLINICAL_ES: bool = os.getenv("ENABLE_CLINICAL_ES", "true").lower() == "true"
+
+# Enable/disable Chilean identification document recognizers
+ENABLE_CHILE: bool = os.getenv("ENABLE_CHILE", "true").lower() == "true"
