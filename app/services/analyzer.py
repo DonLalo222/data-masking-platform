@@ -8,7 +8,7 @@ _engine: AnalyzerEngine | None = None
 
 
 def get_engine() -> AnalyzerEngine:
-    """Return the shared AnalyzerEngine instance (lazily initialised)."""
+    """Return the shared AnalyzerEngine instance (lazily initialized)."""
     global _engine
     if _engine is None:
         _engine = AnalyzerEngine()

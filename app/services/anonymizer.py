@@ -9,7 +9,7 @@ _engine: AnonymizerEngine | None = None
 
 
 def get_engine() -> AnonymizerEngine:
-    """Return the shared AnonymizerEngine instance (lazily initialised)."""
+    """Return the shared AnonymizerEngine instance (lazily initialized)."""
     global _engine
     if _engine is None:
         _engine = AnonymizerEngine()
