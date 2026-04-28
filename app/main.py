@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import config
 from app.routers import analyze, anonymize, recognizers
+from app.services.clinical_recognizers_es import register_clinical_recognizers_es
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    if config.ENABLE_CLINICAL_ES:
+        register_clinical_recognizers_es()
+    yield
 
 _DESCRIPTION = """
 ## Data Masking Platform API
@@ -47,6 +59,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
