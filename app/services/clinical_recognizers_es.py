@@ -153,11 +153,9 @@ def register_clinical_recognizers_es() -> None:
     registry = engine.registry
 
     for recognizer in _build_recognizers():
-        # Remove a previous instance of the same recognizer if present so that
-        # repeated startup calls (e.g. during tests) do not accumulate duplicates.
-        try:
-            registry.remove_recognizer(recognizer.name)
-        except Exception:
-            pass
+        # Remove any previous instance with the same name before adding the new
+        # one, so that repeated calls (e.g. during tests) do not accumulate
+        # duplicate entries.
+        registry.remove_recognizer(recognizer.name)
         registry.add_recognizer(recognizer)
 

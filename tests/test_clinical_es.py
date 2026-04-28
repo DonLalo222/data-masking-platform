@@ -236,9 +236,13 @@ def test_person_in_spanish(client):
 # ---------------------------------------------------------------------------
 
 def test_register_idempotent(client):
+    from app.services.analyzer import get_engine
     from app.services.clinical_recognizers_es import register_clinical_recognizers_es
 
+    registry = get_engine().registry
+    size_before = len(registry.recognizers)
     register_clinical_recognizers_es()
-    register_clinical_recognizers_es()
-    # If no exception is raised the function is idempotent
+    size_after = len(registry.recognizers)
+    # A second registration must not add duplicate entries
+    assert size_after == size_before
 
