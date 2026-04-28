@@ -4,7 +4,13 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Query
 
-from app.models.analyze import AnalyzeRequest, AnalyzeResponse, EntityResult
+from app.models.analyze import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    BatchAnalyzeRequest,
+    BatchAnalyzeResponse,
+    EntityResult,
+)
 from app.services import analyzer as analyzer_svc
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
@@ -38,6 +44,36 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         for r in results
     ]
     return AnalyzeResponse(entities=entities)
+
+
+@router.post(
+    "/batch",
+    response_model=BatchAnalyzeResponse,
+    summary="Analyze multiple texts for PII entities",
+    description="Scan a list of texts for PII entities in a single request. Returns one AnalyzeResponse per input text.",
+)
+async def analyze_batch(request: BatchAnalyzeRequest) -> BatchAnalyzeResponse:
+    results = [
+        AnalyzeResponse(
+            entities=[
+                EntityResult(
+                    entity_type=r.entity_type,
+                    start=r.start,
+                    end=r.end,
+                    score=r.score,
+                    text=text[r.start : r.end],
+                )
+                for r in analyzer_svc.analyze_text(
+                    text=text,
+                    language=request.language,
+                    entities=request.entities,
+                    score_threshold=request.score_threshold,
+                )
+            ]
+        )
+        for text in request.texts
+    ]
+    return BatchAnalyzeResponse(results=results)
 
 
 @router.get(
