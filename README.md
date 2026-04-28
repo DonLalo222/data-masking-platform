@@ -15,6 +15,8 @@ Interactive API docs are available at **`/docs`** (Swagger UI) and **`/redoc`** 
 | **Custom recognizers** | Add regex or deny-list recognizers at runtime via the API |
 | **Batch processing** | Anonymize many texts in one request |
 | **Multi-language** | Any language supported by the underlying spaCy model |
+| **Spanish clinical entities** | Built-in recognizers for ES_DNI, ES_NIE, ES_TARJETA_SANITARIA and more |
+| **Chilean ID entities** | Built-in recognizers for CL_RUN, CL_PASAPORTE, CL_CEDULA_EXTRANJERIA, CL_LICENCIA_CONDUCIR, CL_PHONE |
 | **Swagger / OpenAPI** | Full documentation built in at `/docs` |
 
 ---
@@ -220,6 +222,60 @@ curl -X POST http://localhost:8000/anonymize \
 
 ---
 
+## Chilean identification document recognizers
+
+The platform includes built-in support for **Chilean (es)** identification documents.
+
+### Available Chilean entities
+
+| Entity | Description | Example |
+|--------|-------------|---------|
+| `CL_RUN` | RUN/RUT chileno with check digit (including K) | `12.345.678-9` |
+| `CL_PASAPORTE` | Chilean passport — 1-2 letters + 6-7 digits | `A1234567` |
+| `CL_CEDULA_EXTRANJERIA` | Foreigner identity card — PE + 7 digits | `PE1234567` |
+| `CL_LICENCIA_CONDUCIR` | Chilean driver's licence — letter + 7 digits | `B1234567` |
+| `CL_PHONE` | Chilean phone number (+56 / local) | `+56 9 1234 5678` |
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_CHILE` | `true` | Enable/disable Chilean identification recognizers on startup |
+
+### Usage examples
+
+#### Detect a RUT and phone number
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "El RUT del paciente es 12.345.678-9 y su teléfono es +56 9 1234 5678",
+    "language": "es",
+    "entities": ["CL_RUN", "CL_PHONE"]
+  }'
+```
+
+#### Anonymize a Chilean clinical note
+
+```bash
+curl -X POST http://localhost:8000/anonymize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Paciente Juan Pérez, RUT 12.345.678-9, pasaporte A1234567. Teléfono: +56912345678.",
+    "language": "es",
+    "operators": {
+      "PERSON":               { "type": "replace", "params": { "new_value": "[PACIENTE]" } },
+      "CL_RUN":               { "type": "redact" },
+      "CL_PASAPORTE":         { "type": "redact" },
+      "CL_PHONE":             { "type": "mask", "params": { "masking_char": "*", "chars_to_mask": 6, "from_end": true } },
+      "DEFAULT":              { "type": "replace" }
+    }
+  }'
+```
+
+---
+
 Environment variables (override in `docker-compose.yml` or your shell):
 
 | Variable | Default | Description |
@@ -228,6 +284,7 @@ Environment variables (override in `docker-compose.yml` or your shell):
 | `DEFAULT_LANGUAGE` | `en` | BCP-47 language code |
 | `DEFAULT_SCORE_THRESHOLD` | `0.5` | Minimum confidence score |
 | `ENABLE_CLINICAL_ES` | `true` | Enable Spanish clinical recognizers (ISO/CIE-10/HL7) |
+| `ENABLE_CHILE` | `true` | Enable Chilean identification document recognizers |
 
 ---
 
@@ -256,11 +313,13 @@ app/
 └── services/
     ├── analyzer.py             # Presidio AnalyzerEngine wrapper (en + es)
     ├── anonymizer.py           # Presidio AnonymizerEngine wrapper
+    ├── chile_recognizers.py    # Chilean identification document recognizers
     ├── clinical_recognizers_es.py  # Spanish clinical recognizers (ISO/CIE-10/HL7)
     └── recognizer_registry.py # Custom recognizer management
 tests/
 ├── test_analyze.py
 ├── test_anonymize.py
+├── test_chile_recognizers.py   # Chilean identification recognizer tests
 ├── test_clinical_es.py         # Spanish clinical recognizer tests
 └── test_recognizers.py
 ```

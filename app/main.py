@@ -9,12 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import config
 from app.routers import analyze, anonymize, recognizers
 from app.services.clinical_recognizers_es import register_clinical_recognizers_es
+from app.services.chile_recognizers import register_chile_recognizers
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if config.ENABLE_CLINICAL_ES:
         register_clinical_recognizers_es()
+    if config.ENABLE_CHILE:
+        register_chile_recognizers()
     yield
 
 _DESCRIPTION = """
