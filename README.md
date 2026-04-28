@@ -68,6 +68,7 @@ docker compose up --build
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/analyze` | Detect PII entities in text |
+| POST | `/analyze/batch` | Detect PII entities in a list of texts |
 | GET | `/analyze/entities` | List all supported entity types |
 
 ### Anonymization

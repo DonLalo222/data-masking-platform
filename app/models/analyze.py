@@ -41,3 +41,32 @@ class EntityResult(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     entities: List[EntityResult]
+
+
+class BatchAnalyzeRequest(BaseModel):
+    texts: List[str] = Field(..., description="List of texts to scan for PII entities.")
+    language: str = Field("en", description="BCP-47 language code (e.g. 'en', 'es').")
+    entities: Optional[List[str]] = Field(
+        None,
+        description="Limit detection to these entity types. Omit to detect all supported types.",
+    )
+    score_threshold: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence score (0–1) for a detection to be returned.",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "texts": ["juan.garcia@ejemplo.com", "612345678", "Juan García"],
+                "language": "es",
+                "score_threshold": 0.5,
+            }
+        }
+    }
+
+
+class BatchAnalyzeResponse(BaseModel):
+    results: List[AnalyzeResponse]
