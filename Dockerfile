@@ -7,6 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Download the spaCy English model used by Presidio
 RUN python -m spacy download en_core_web_lg
+# Download the spaCy Spanish model for clinical support
+RUN python -m spacy download es_core_news_lg
 
 COPY . .
 

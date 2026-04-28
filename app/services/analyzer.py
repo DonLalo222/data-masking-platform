@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from presidio_analyzer import AnalyzerEngine, RecognizerResult
+from presidio_analyzer.nlp_engine import NlpEngineProvider
 
 _engine: AnalyzerEngine | None = None
 
@@ -11,7 +12,19 @@ def get_engine() -> AnalyzerEngine:
     """Return the shared AnalyzerEngine instance (lazily initialized)."""
     global _engine
     if _engine is None:
-        _engine = AnalyzerEngine()
+        configuration = {
+            "nlp_engine_name": "spacy",
+            "models": [
+                {"lang_code": "en", "model_name": "en_core_web_lg"},
+                {"lang_code": "es", "model_name": "es_core_news_lg"},
+            ],
+        }
+        provider = NlpEngineProvider(nlp_configuration=configuration)
+        nlp_engine = provider.create_engine()
+        _engine = AnalyzerEngine(
+            nlp_engine=nlp_engine,
+            supported_languages=["en", "es"],
+        )
     return _engine
 
 
