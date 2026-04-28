@@ -1,223 +1,193 @@
 # Data Masking Platform
 
-A **FastAPI-based REST API** for masking sensitive data from multiple database types. Connect to PostgreSQL, MySQL, SQLite or SQL Server, configure masking rules per column, and download the masked dataset as CSV or JSON.
+A Python REST API for detecting and masking **Personally Identifiable Information (PII)**, powered by [Microsoft Presidio](https://microsoft.github.io/presidio/).
+
+Interactive API docs are available at **`/docs`** (Swagger UI) and **`/redoc`** (ReDoc) once the service is running.
 
 ---
 
 ## Features
 
-- 🔌 **Multi-DB support** — PostgreSQL, MySQL, SQLite, SQL Server
-- 🔍 **Schema introspection** — discover tables and columns automatically
-- 🛡️ **8 masking strategies** — anonymize, pseudonymize, obfuscate, tokenize, encrypt, generalize, shuffle, keep
-- 📦 **Export** — download masked datasets as CSV or JSON
-- 📄 **OpenAPI docs** — interactive docs at `/docs`
+| Feature | Details |
+|---------|---------|
+| **PII detection** | 50+ entity types — names, e-mails, phones, credit cards, IBANs, IP addresses, SSNs and more |
+| **Flexible masking** | Six anonymization strategies, configurable per entity type |
+| **Custom recognizers** | Add regex or deny-list recognizers at runtime via the API |
+| **Batch processing** | Anonymize many texts in one request |
+| **Multi-language** | Any language supported by the underlying spaCy model |
+| **Swagger / OpenAPI** | Full documentation built in at `/docs` |
 
 ---
 
-## Project Structure
+## Anonymization operators
 
-```
-data-masking-platform/
-├── app/
-│   ├── main.py                  # FastAPI entry point
-│   ├── store.py                 # In-memory storage
-│   ├── connector_factory.py     # Connector factory
-│   ├── routers/
-│   │   ├── connections.py       # CRUD for DB connections
-│   │   ├── schemas.py           # Schema introspection
-│   │   ├── rules.py             # Masking rules CRUD
-│   │   └── export.py            # Export endpoint
-│   ├── connectors/
-│   │   ├── base.py              # Abstract base connector
-│   │   ├── postgres.py
-│   │   ├── mysql.py
-│   │   ├── sqlite.py
-│   │   └── sqlserver.py
-│   ├── masking/
-│   │   ├── engine.py            # Applies rules row by row
-│   │   ├── anonymize.py
-│   │   ├── pseudonymize.py
-│   │   ├── obfuscate.py
-│   │   ├── tokenize.py
-│   │   ├── encrypt.py
-│   │   ├── generalize.py
-│   │   └── shuffle.py
-│   └── models/
-│       ├── connection.py
-│       ├── rule.py
-│       └── export.py
-├── tests/
-│   ├── test_connections.py
-│   ├── test_masking.py
-│   └── test_export.py
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── README.md
-```
+| Operator | Description | Parameters |
+|----------|-------------|------------|
+| `replace` | Substitute with a fixed string | `new_value` (default: `<ENTITY_TYPE>`) |
+| `redact` | Remove the entity entirely | — |
+| `hash` | Replace with a digest | `hash_type`: `md5` · `sha256` (default) · `sha512` |
+| `encrypt` | AES-CBC encryption | `key`: 16-byte base64-encoded key |
+| `mask` | Overwrite N characters | `masking_char`, `chars_to_mask`, `from_end` |
+| `keep` | Preserve the original value | — |
+
+Specify per-entity overrides in the `operators` map; use the `DEFAULT` key as a catch-all fallback.
 
 ---
 
-## Running with Docker
+## Quick start
+
+### Local (Python 3.11+)
 
 ```bash
-# Start the API + PostgreSQL + MySQL
-docker compose up --build
-
-# API available at http://localhost:8000
-# Interactive docs at http://localhost:8000/docs
-```
-
----
-
-## Running Locally
-
-```bash
-# 1. Create a virtual environment
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
-
-# 2. Install dependencies
 pip install -r requirements.txt
-
-# 3. Start the server
+python -m spacy download en_core_web_lg
 uvicorn app.main:app --reload
+```
 
-# API available at http://localhost:8000
-# Interactive docs at http://localhost:8000/docs
+Open <http://localhost:8000/docs> for the interactive Swagger UI.
+
+### Docker
+
+```bash
+docker compose up --build
 ```
 
 ---
 
-## Running Tests
+## API reference
 
-```bash
-pytest tests/ -v
-```
+### Health
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Health check |
+
+### Analysis
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/analyze` | Detect PII entities in text |
+| GET | `/analyze/entities` | List all supported entity types |
+
+### Anonymization
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/anonymize` | Anonymize PII in a single text |
+| POST | `/anonymize/batch` | Anonymize a list of texts |
+
+### Custom recognizers
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/recognizers` | List all recognizers (built-in + custom) |
+| POST | `/recognizers` | Add a custom recognizer |
+| DELETE | `/recognizers/{name}` | Remove a custom recognizer |
 
 ---
 
-## API Usage Examples
+## Usage examples
 
-### Health Check
-
-```bash
-curl http://localhost:8000/
-```
-
-### Connections
+### Detect PII
 
 ```bash
-# Create a SQLite connection (no external DB required)
-curl -X POST http://localhost:8000/connections \
-  -H "Content-Type: application/json" \
-  -d '{"name": "local-sqlite", "db_type": "sqlite", "database": "mydata.db"}'
-
-# Create a PostgreSQL connection
-curl -X POST http://localhost:8000/connections \
-  -H "Content-Type: application/json" \
-  -d '{"name": "prod-pg", "db_type": "postgres", "host": "localhost", "port": 5432, "database": "mydb", "username": "user", "password": "pass"}'
-
-# List all connections
-curl http://localhost:8000/connections
-
-# Get a connection by ID
-curl http://localhost:8000/connections/{id}
-
-# Test a connection
-curl -X POST http://localhost:8000/connections/{id}/test
-
-# Delete a connection
-curl -X DELETE http://localhost:8000/connections/{id}
-```
-
-### Schema Introspection
-
-```bash
-# List tables
-curl http://localhost:8000/connections/{id}/schema/tables
-
-# List columns for a table
-curl http://localhost:8000/connections/{id}/schema/tables/users/columns
-```
-
-### Masking Rules
-
-```bash
-# Create a masking profile
-curl -X POST http://localhost:8000/rules \
+curl -X POST http://localhost:8000/analyze \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "profile_users",
-    "connection_id": "{connection_id}",
-    "table": "users",
-    "column_rules": [
-      {"column": "id",    "strategy": "keep",        "options": {}},
-      {"column": "name",  "strategy": "pseudonymize", "options": {}},
-      {"column": "email", "strategy": "obfuscate",    "options": {}},
-      {"column": "age",   "strategy": "generalize",   "options": {"bucket_size": 10}}
-    ]
+    "text": "Hello, my name is John Smith and my e-mail is john@example.com",
+    "language": "en"
   }'
-
-# List all rules
-curl http://localhost:8000/rules
-
-# Get a rule
-curl http://localhost:8000/rules/{id}
-
-# Update a rule
-curl -X PUT http://localhost:8000/rules/{id} \
-  -H "Content-Type: application/json" \
-  -d '{"name": "updated-profile"}'
-
-# Delete a rule
-curl -X DELETE http://localhost:8000/rules/{id}
 ```
 
-### Export
+### Anonymize with custom operators
 
 ```bash
-# Export as CSV (download)
-curl -X POST http://localhost:8000/export \
+curl -X POST http://localhost:8000/anonymize \
   -H "Content-Type: application/json" \
-  -d '{"rule_id": "{rule_id}", "format": "csv", "limit": 1000}' \
-  --output masked_data.csv
+  -d '{
+    "text": "Hello John Smith, contact me at john@example.com",
+    "language": "en",
+    "operators": {
+      "PERSON":        { "type": "replace", "params": { "new_value": "[NAME]" } },
+      "EMAIL_ADDRESS": { "type": "mask",    "params": { "masking_char": "*", "chars_to_mask": 10, "from_end": false } },
+      "DEFAULT":       { "type": "redact" }
+    }
+  }'
+```
 
-# Export as JSON
-curl -X POST http://localhost:8000/export \
+### Add a custom regex recognizer
+
+```bash
+curl -X POST http://localhost:8000/recognizers \
   -H "Content-Type: application/json" \
-  -d '{"rule_id": "{rule_id}", "format": "json", "limit": 1000}'
+  -d '{
+    "name": "employee_id_recognizer",
+    "supported_entity": "EMPLOYEE_ID",
+    "supported_language": "en",
+    "type": "pattern",
+    "patterns": [
+      { "name": "emp_id", "regex": "EMP\\d{6}", "score": 0.9 }
+    ],
+    "context": ["employee", "staff", "id"]
+  }'
+```
+
+### Add a deny-list recognizer
+
+```bash
+curl -X POST http://localhost:8000/recognizers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "codename_recognizer",
+    "supported_entity": "PROJECT_CODENAME",
+    "supported_language": "en",
+    "type": "deny_list",
+    "deny_list": ["Project Alpha", "Project Beta", "Project Gamma"]
+  }'
 ```
 
 ---
 
-## Supported DB Types
+## Configuration
 
-| DB Type | `db_type` value | Driver |
-|---------|-----------------|--------|
-| PostgreSQL | `postgres` | psycopg2 |
-| MySQL / MariaDB | `mysql` | pymysql |
-| SQLite | `sqlite` | sqlite3 (built-in) |
-| SQL Server | `sqlserver` | pyodbc |
+Environment variables (override in `docker-compose.yml` or your shell):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NLP_ENGINE_MODEL` | `en_core_web_lg` | spaCy model used by Presidio |
+| `DEFAULT_LANGUAGE` | `en` | BCP-47 language code |
+| `DEFAULT_SCORE_THRESHOLD` | `0.5` | Minimum confidence score |
 
 ---
 
-## Masking Strategies
+## Running tests
 
-| Strategy | `strategy` value | Behavior |
-|----------|-----------------|----------|
-| Keep | `keep` | Return value unchanged |
-| Anonymize | `anonymize` | Replace with `null` |
-| Pseudonymize | `pseudonymize` | Replace with consistent fake data (Faker, deterministic seed) |
-| Obfuscate | `obfuscate` | Mask middle characters — `****1234`, `u***@****.com` |
-| Tokenize | `tokenize` | `tok_` + first 8 chars of SHA-256 hash |
-| Encrypt | `encrypt` | Full SHA-256 hex digest |
-| Generalize | `generalize` | Numeric bucket — `34` → `"30-40"` (configurable `bucket_size`) |
-| Shuffle | `shuffle` | Shuffle column values across rows |
+```bash
+python -m pytest tests/ -v
+```
 
-### `generalize` options
+---
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `bucket_size` | `10` | Size of each numeric range bucket |
+## Project structure
 
+```
+app/
+├── main.py                     # FastAPI application entry point
+├── config.py                   # Environment-based configuration
+├── routers/
+│   ├── analyze.py              # /analyze endpoints
+│   ├── anonymize.py            # /anonymize endpoints
+│   └── recognizers.py         # /recognizers endpoints
+├── models/
+│   ├── analyze.py              # Pydantic request/response models
+│   ├── anonymize.py
+│   └── recognizer.py
+└── services/
+    ├── analyzer.py             # Presidio AnalyzerEngine wrapper
+    ├── anonymizer.py           # Presidio AnonymizerEngine wrapper
+    └── recognizer_registry.py # Custom recognizer management
+tests/
+├── test_analyze.py
+├── test_anonymize.py
+└── test_recognizers.py
+```
