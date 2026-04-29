@@ -22,6 +22,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://api:8000
+      # API_TARGET_URL is used ONLY by the Vite proxy (Node.js, server-side).
+      # It is NOT exposed to the browser — the browser always calls /api/*
+      # and the Vite dev server forwards those requests here.
+      # 'api' is the Docker-internal hostname of the api service above.
+      - API_TARGET_URL=http://api:8000
     depends_on:
       - api
