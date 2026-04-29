@@ -1,4 +1,4 @@
-"""Tests for MINSAL Chile / Ley 19.628 compliance profile."""
+"""Tests for MINSAL Chile / Ley 19.628 / Ley 20.584 compliance profile."""
 
 from __future__ import annotations
 
@@ -84,3 +84,79 @@ def test_minsal_risk_score_present(client):
     assert data["risk_score"] is not None
     assert isinstance(data["risk_score"], float)
     assert data["risk_level"] in ("low", "medium", "high")
+
+
+def test_minsal_anonymize_person(client):
+    """Patient name (PERSON) should be replaced with <PACIENTE>."""
+    response = client.post(
+        "/compliance/minsal",
+        json={
+            "text": "El paciente Juan Pérez fue dado de alta.",
+            "language": "es",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "<PACIENTE>" in data["text"]
+
+
+def test_minsal_anonymize_email(client):
+    """Email address should be redacted completely."""
+    response = client.post(
+        "/compliance/minsal",
+        json={
+            "text": "Contacto: paciente@ejemplo.cl",
+            "language": "es",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "paciente@ejemplo.cl" not in data["text"]
+
+
+def test_minsal_response_has_audit_id(client):
+    """MINSAL response should include risk_score, framework and audit_id."""
+    response = client.post(
+        "/compliance/minsal",
+        json={
+            "text": "RUT 12.345.678-9",
+            "language": "es",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "risk_score" in data
+    assert "framework" in data
+    assert "audit_id" in data
+    assert data["framework"] == "minsal"
+
+
+def test_minsal_region_kept(client):
+    """CL_REGION should be preserved (operator 'keep')."""
+    response = client.post(
+        "/compliance/minsal",
+        json={
+            "text": "El paciente vive en Metropolitana.",
+            "language": "es",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    # The region name must still be present in the anonymized output
+    assert "Metropolitana" in data["text"]
+
+
+def test_minsal_fonasa_isapre_replaced_with_prevision(client):
+    """CL_FONASA_ISAPRE should be replaced with <PREVISION>."""
+    response = client.post(
+        "/compliance/minsal",
+        json={
+            "text": "Previsión del paciente: FONASA",
+            "language": "es",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "FONASA" not in data["text"]
+    assert "<PREVISION>" in data["text"]
+

@@ -59,17 +59,29 @@ HIPAA_SAFE_HARBOR_ENTITIES: List[str] = [
 ]
 
 MINSAL_ENTITIES: List[str] = [
+    # Identificadores personales chilenos
     "CL_RUT",
-    "CL_PHONE_NUMBER",
-    "CL_FONASA_ISAPRE",
+    "CL_PASAPORTE",
+    "CL_CEDULA_EXTRANJERIA",
+    "CL_NSS",
+    # Datos clínicos
     "CL_FICHA_CLINICA",
-    "CL_POSTAL_CODE",
+    "CL_FONASA_ISAPRE",
+    # Datos de contacto/ubicación
+    "CL_PHONE",
     "CL_REGION",
+    # Entidades genéricas de Presidio
     "PERSON",
     "EMAIL_ADDRESS",
     "DATE_TIME",
     "LOCATION",
     "ADDRESS",
+    "PHONE_NUMBER",
+    # Datos financieros que pueden aparecer en fichas digitales
+    "CREDIT_CARD",
+    "IBAN_CODE",
+    "IP_ADDRESS",
+    "URL",
 ]
 
 # ---------------------------------------------------------------------------
@@ -83,19 +95,37 @@ _HIPAA_SAFE_HARBOR_OPERATORS: Dict[str, dict] = {
 _HIPAA_SAFE_HARBOR_OPERATORS["DEFAULT"] = {"type": "replace", "params": {}}
 
 _MINSAL_OPERATORS: Dict[str, dict] = {
+    # Identificadores: reemplazar con placeholder
     "CL_RUT": {"type": "replace", "params": {"new_value": "<RUT>"}},
-    "CL_PHONE_NUMBER": {
-        "type": "mask",
-        "params": {"masking_char": "*", "chars_to_mask": 6, "from_end": True},
-    },
-    "CL_FONASA_ISAPRE": {"type": "replace", "params": {"new_value": "<PREVISION>"}},
+    "CL_PASAPORTE": {"type": "replace", "params": {"new_value": "<PASAPORTE>"}},
+    "CL_CEDULA_EXTRANJERIA": {"type": "replace", "params": {"new_value": "<CEDULA_EXT>"}},
+    "CL_NSS": {"type": "replace", "params": {"new_value": "<NSS>"}},
+    # Ficha clínica: reemplazar (es un identificador directo)
     "CL_FICHA_CLINICA": {"type": "replace", "params": {"new_value": "<FICHA>"}},
-    "CL_POSTAL_CODE": {"type": "replace", "params": {"new_value": "<CP>"}},
+    # Previsión: reemplazar con placeholder genérico
+    "CL_FONASA_ISAPRE": {"type": "replace", "params": {"new_value": "<PREVISION>"}},
+    # Teléfonos: enmascarar últimos 6 dígitos
+    "CL_PHONE": {"type": "mask", "params": {"masking_char": "*", "chars_to_mask": 6, "from_end": True}},
+    "PHONE_NUMBER": {"type": "mask", "params": {"masking_char": "*", "chars_to_mask": 6, "from_end": True}},
+    # Región: conservar (dato geográfico agregado, no re-identificador)
     "CL_REGION": {"type": "keep"},
+    # Persona: reemplazar
     "PERSON": {"type": "replace", "params": {"new_value": "<PACIENTE>"}},
+    # Email: eliminar completamente
     "EMAIL_ADDRESS": {"type": "redact"},
-    "DATE_TIME": {"type": "replace", "params": {"new_value": "<FECHA>"}},
+    # Fecha: reemplazar con placeholder de año (Presidio no extrae el año
+    # directamente; se usa un placeholder genérico conforme a Ley 20.584)
+    "DATE_TIME": {"type": "replace", "params": {"new_value": "<AÑO>"}},
+    # Dirección: reemplazar
     "LOCATION": {"type": "replace", "params": {"new_value": "<LUGAR>"}},
+    "ADDRESS": {"type": "replace", "params": {"new_value": "<DIRECCION>"}},
+    # Datos financieros: eliminar completamente
+    "CREDIT_CARD": {"type": "redact"},
+    "IBAN_CODE": {"type": "redact"},
+    # Datos digitales: eliminar
+    "IP_ADDRESS": {"type": "redact"},
+    "URL": {"type": "redact"},
+    # Fallback
     "DEFAULT": {"type": "replace"},
 }
 
@@ -135,16 +165,19 @@ _FRAMEWORKS: List[FrameworkInfo] = [
     ),
     FrameworkInfo(
         id="minsal",
-        name="MINSAL Chile / Ley 19.628",
+        name="MINSAL Chile / Ley 19.628 / Ley 20.584",
         description=(
             "Anonymization profile for the Chilean Ministry of Health (MINSAL) "
-            "aligned with Ley 19.628 de Protección de la Vida Privada."
+            "aligned with Ley 19.628 de Protección de la Vida Privada and "
+            "Ley 20.584 sobre Derechos y Deberes de los Pacientes."
         ),
         jurisdiction="Chile",
         entities_covered=MINSAL_ENTITIES,
         references=[
             "Ley 19.628 (Chile)",
+            "Ley 20.584 (Chile)",
             "https://www.bcn.cl/leychile/navegar?idNorma=141599",
+            "https://www.bcn.cl/leychile/navegar?idNorma=1039348",
         ],
     ),
     FrameworkInfo(

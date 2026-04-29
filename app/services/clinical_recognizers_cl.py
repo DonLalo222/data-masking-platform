@@ -1,4 +1,4 @@
-"""Chilean clinical recognizers aligned with MINSAL and Ley 19.628."""
+"""Chilean clinical recognizers aligned with MINSAL, Ley 19.628 and Ley 20.584."""
 
 from __future__ import annotations
 
@@ -12,32 +12,35 @@ from app.services.analyzer import get_engine
 # Shared clinical context keywords (boost score when these appear near match)
 # ---------------------------------------------------------------------------
 _CLINICAL_CONTEXT = [
-    "paciente",
     "rut",
     "run",
-    "documento",
-    "ficha clínica",
-    "diagnóstico",
+    "paciente",
+    "ficha",
+    "cédula",
+    "cedula",
+    "pasaporte",
+    "afiliado",
     "fonasa",
     "isapre",
-    "prevision",
     "previsión",
-    "beneficiario",
-    "consulta",
-    "médico",
+    "prevision",
+    "teléfono",
+    "telefono",
+    "celular",
+    "número",
+    "numero",
+    "registro",
     "hospital",
     "clínica",
-    "urgencia",
-    "atención primaria",
+    "clinica",
     "cesfam",
-    "registro civil",
 ]
 
 
 def _build_recognizers() -> list[PatternRecognizer]:
     """Return fresh PatternRecognizer instances for all Chilean clinical entities."""
     return [
-        # RUT chileno — with and without dots
+        # RUT chileno — with dots (score 0.88) and without dots (score 0.82)
         PatternRecognizer(
             supported_entity="CL_RUT",
             name="ClRutRecognizer",
@@ -45,69 +48,69 @@ def _build_recognizers() -> list[PatternRecognizer]:
             patterns=[
                 Pattern(
                     name="CL_RUT_with_dots",
-                    regex=r"\b\d{1,2}(?:\.\d{3}){2}-[\dkK]\b",
-                    score=0.90,
+                    regex=r"\b\d{1,3}(?:\.\d{3}){2}-[\dKk]\b",
+                    score=0.88,
                 ),
                 Pattern(
                     name="CL_RUT_no_dots",
-                    regex=r"\b\d{7,8}-[\dkK]\b",
-                    score=0.85,
+                    regex=r"\b\d{7,8}-[\dKk]\b",
+                    score=0.82,
                 ),
             ],
             context=_CLINICAL_CONTEXT,
         ),
-        # Chilean phone numbers — E.164 / ITU-T
+        # Chilean passport — 1-2 uppercase letters + 6-7 digits
         PatternRecognizer(
-            supported_entity="CL_PHONE_NUMBER",
-            name="ClPhoneRecognizer",
+            supported_entity="CL_PASAPORTE",
+            name="ClPasaporteRecognizer",
             supported_language="es",
             patterns=[
                 Pattern(
-                    name="CL_PHONE_INTL",
-                    regex=r"(?:\+56|0056|56)\s?[2-9]\s?\d{4}\s?\d{4}",
-                    score=0.85,
-                ),
-                Pattern(
-                    name="CL_PHONE_LOCAL",
-                    regex=r"\b[2-9]\d{7,8}\b",
-                    score=0.65,
+                    name="CL_PASAPORTE",
+                    regex=r"\b[A-Z]{1,2}\d{6,7}\b",
+                    score=0.75,
                 ),
             ],
-            context=[
-                "teléfono",
-                "tel",
-                "móvil",
-                "celular",
-                "fono",
-                "contacto",
-            ],
+            context=_CLINICAL_CONTEXT,
         ),
-        # FONASA / ISAPRE beneficiary number
+        # Cédula de extranjería — PE + 7 digits
         PatternRecognizer(
-            supported_entity="CL_FONASA_ISAPRE",
-            name="ClFonasaIsapreRecognizer",
+            supported_entity="CL_CEDULA_EXTRANJERIA",
+            name="ClCedulaExtranjeriaRecognizer",
             supported_language="es",
             patterns=[
                 Pattern(
-                    name="CL_FONASA",
-                    regex=r"\bFONASA[-\s]?\d{8,10}\b",
-                    score=0.90,
+                    name="CL_CEDULA_EXTRANJERIA",
+                    regex=r"\bPE\d{7}\b",
+                    score=0.80,
                 ),
+            ],
+            context=_CLINICAL_CONTEXT,
+        ),
+        # Número de afiliado previsional (FONASA/ISAPRE) — NSS
+        PatternRecognizer(
+            supported_entity="CL_NSS",
+            name="ClNssRecognizer",
+            supported_language="es",
+            patterns=[
                 Pattern(
-                    name="CL_ISAPRE",
-                    regex=r"\bISAPRE[-\s]?\d{6,10}\b",
-                    score=0.90,
+                    name="CL_NSS",
+                    regex=r"\b\d{10}\b",
+                    score=0.65,
                 ),
             ],
             context=[
                 "fonasa",
                 "isapre",
+                "afiliado",
+                "cotizante",
                 "previsión",
-                "beneficiario",
-                "plan de salud",
+                "prevision",
             ],
         ),
-        # Clinical record / historia clínica number
+        # Clinical record / ficha clínica number — case insensitive ((?i) flag)
+        # Matches: "ficha", "Ficha", "FICHA", "HC", "FC", "HCL" followed by optional
+        # separator and 4–10 digits. Example: "Ficha clínica FC-12345", "HC-000456"
         PatternRecognizer(
             supported_entity="CL_FICHA_CLINICA",
             name="ClFichaClinicaRecognizer",
@@ -115,40 +118,30 @@ def _build_recognizers() -> list[PatternRecognizer]:
             patterns=[
                 Pattern(
                     name="CL_FICHA_CLINICA",
-                    regex=r"\b(?:HC|FC|HCL)[-\s]?\d{4,12}\b",
-                    score=0.88,
+                    regex=r"(?i)\b(?:ficha|HC|FC|HCL)\s*[-:]?\s*\d{4,10}\b",
+                    score=0.85,
                 ),
             ],
-            context=[
-                "ficha",
-                "historia clínica",
-                "registro",
-                "número de ficha",
-                "código paciente",
-            ],
+            context=_CLINICAL_CONTEXT,
         ),
-        # Chilean postal code — 7 digits
+        # FONASA / ISAPRE health insurer names — deny_list
         PatternRecognizer(
-            supported_entity="CL_POSTAL_CODE",
-            name="ClPostalCodeRecognizer",
+            supported_entity="CL_FONASA_ISAPRE",
+            name="ClFonasaIsapreRecognizer",
             supported_language="es",
-            patterns=[
-                Pattern(
-                    name="CL_POSTAL_CODE",
-                    regex=r"\b\d{7}\b",
-                    score=0.60,
-                ),
+            deny_list=[
+                "FONASA",
+                "Banmédica",
+                "Colmena",
+                "Cruz Blanca",
+                "Consalud",
+                "Vida Tres",
+                "MasVida",
+                "Esencial",
             ],
-            context=[
-                "código postal",
-                "cp",
-                "dirección",
-                "domicilio",
-                "región",
-                "comuna",
-            ],
+            context=_CLINICAL_CONTEXT,
         ),
-        # Chilean regions — deny_list
+        # Chilean regions — deny_list (all 16 regions)
         PatternRecognizer(
             supported_entity="CL_REGION",
             name="ClRegionRecognizer",
@@ -177,6 +170,44 @@ def _build_recognizers() -> list[PatternRecognizer]:
                 "comuna",
                 "localidad",
                 "domicilio",
+            ],
+        ),
+        # Chilean phone numbers — E.164 / ITU-T
+        # Matches numbers with optional +56/0056/56 country code followed by a
+        # local number (9 digits starting with 2-9). Relies on clinical context
+        # keywords to avoid false positives on ambiguous digit sequences.
+        PatternRecognizer(
+            supported_entity="CL_PHONE",
+            name="ClPhoneRecognizer",
+            supported_language="es",
+            patterns=[
+                Pattern(
+                    name="CL_PHONE",
+                    regex=r"(?:\+56|0056|56)?[\s\-]?[2-9](?:[\s\-]?\d){8}",
+                    score=0.70,
+                ),
+            ],
+            context=_CLINICAL_CONTEXT,
+        ),
+        # Chilean postal code — 7 digits
+        PatternRecognizer(
+            supported_entity="CL_POSTAL_CODE",
+            name="ClPostalCodeRecognizer",
+            supported_language="es",
+            patterns=[
+                Pattern(
+                    name="CL_POSTAL_CODE",
+                    regex=r"\b\d{7}\b",
+                    score=0.60,
+                ),
+            ],
+            context=[
+                "código postal",
+                "cp",
+                "dirección",
+                "domicilio",
+                "región",
+                "comuna",
             ],
         ),
     ]
