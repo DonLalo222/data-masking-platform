@@ -14,3 +14,14 @@ services:
       # Override the default score threshold (default: 0.5)
       # - DEFAULT_SCORE_THRESHOLD=0.5
     restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://api:8000
+    depends_on:
+      - api
