@@ -357,7 +357,7 @@ function TabPreview({ inputMode, policy, language, csvFile, csvPreview, columnMa
       setRowLoading((prev) => ({ ...prev, [i]: true }));
       try {
         const res = await callApiForRow(MOCK_ROWS[i]);
-        newResults.push({ ...MOCK_ROWS[i], anonymizedNotas: res.text ?? res.pseudonymized_text ?? res.text, risk_score: res.risk_score, risk_level: res.risk_level });
+        newResults.push({ ...MOCK_ROWS[i], anonymizedNotas: res.text ?? res.pseudonymized_text ?? '', risk_score: res.risk_score, risk_level: res.risk_level });
       } catch (e) {
         newResults.push({ ...MOCK_ROWS[i], anonymizedNotas: '[Error]', error: e.message });
       }
@@ -478,7 +478,7 @@ function TabPreview({ inputMode, policy, language, csvFile, csvPreview, columnMa
             {[
               { label: 'Filas procesadas', value: csvResult.total_rows },
               { label: 'Framework', value: csvResult.framework },
-              { label: 'Riesgo promedio', value: `${(csvResult.overall_risk_score * 100).toFixed(1)}%` },
+              { label: 'Riesgo promedio', value: `${((csvResult.overall_risk_score ?? 0) * 100).toFixed(1)}%` },
               {
                 label: 'Nivel de riesgo',
                 value: (
@@ -520,8 +520,8 @@ function TabPreview({ inputMode, policy, language, csvFile, csvPreview, columnMa
                         </td>
                       ))}
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${RISK_COLORS[row.risk_score > 0.6 ? 'high' : row.risk_score > 0.25 ? 'medium' : 'low']}`}>
-                          {((row.risk_score || 0) * 100).toFixed(0)}%
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${RISK_COLORS[(row.risk_score ?? 0) > 0.6 ? 'high' : (row.risk_score ?? 0) > 0.25 ? 'medium' : 'low']}`}>
+                          {(((row.risk_score ?? 0)) * 100).toFixed(0)}%
                         </span>
                       </td>
                     </tr>

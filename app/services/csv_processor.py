@@ -185,7 +185,6 @@ def process_csv(
             structured_map[mapping.column] = mapping
 
     rows: List[CsvRowResult] = []
-    all_risk_scores: List[float] = []
     columns_processed: Set[str] = set()
 
     for row_index, row in enumerate(reader):
@@ -233,7 +232,6 @@ def process_csv(
 
         risk_result = risk_scoring.score(row_entities)
         row_risk_score = risk_result["risk_score"]
-        all_risk_scores.append(row_risk_score)
 
         rows.append(
             CsvRowResult(
@@ -245,21 +243,20 @@ def process_csv(
             )
         )
 
-    overall_risk_score = sum(all_risk_scores) / len(all_risk_scores) if all_risk_scores else 0.0
     overall_risk_result = risk_scoring.score(
         [e for r in rows for e in r.entities_found]
     )
+    overall_risk_score = overall_risk_result["risk_score"]
     overall_risk_level = overall_risk_result["risk_level"]
 
     audit_id = str(uuid.uuid4())
     processing_time_ms = (time.perf_counter() - start_time) * 1000
 
-    all_entities = [e for r in rows for e in r.entities_found]
     audit_log.record(
         operation="CSV_PROCESS",
         language=request.language,
         framework=request.framework,
-        entities_found=all_entities,
+        entities_found=[e for r in rows for e in r.entities_found],
         operators_applied=list(columns_processed),
         input_length=len(text),
         risk_score=overall_risk_score,
