@@ -13,6 +13,11 @@ from presidio_analyzer import RecognizerResult
 _DEFAULT_KEY: str = os.getenv("PSEUDONYMIZATION_KEY", "change-me-in-production-32bytes!")
 
 
+def get_default_key() -> str:
+    """Return the default pseudonymization key (reads from environment at call time)."""
+    return os.getenv("PSEUDONYMIZATION_KEY", "change-me-in-production-32bytes!")
+
+
 def _make_pseudonym(value: str, entity_type: str, key: str) -> str:
     """Generate a deterministic pseudonym token for a given value and entity type."""
     raw = f"{entity_type}\x00{value}".encode("utf-8")

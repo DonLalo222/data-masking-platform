@@ -342,7 +342,7 @@ def iso25237_pseudonymize(request: PseudonymizeRequest) -> PseudonymizeResponse:
         score_threshold=request.score_threshold,
     )
 
-    key = request.pseudonym_key or pseudonymization._DEFAULT_KEY
+    key = request.pseudonym_key or pseudonymization.get_default_key()
     pseudonymized_text, pseudonym_map = pseudonymization.pseudonymize_text(
         text=request.text,
         analyzer_results=analyzer_results,

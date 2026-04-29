@@ -37,7 +37,7 @@ def test_pseudonymize_deterministic(client):
     payload = {
         "text": "Contact me at alice@example.com for details.",
         "language": "en",
-        "pseudonym_key": "test-deterministic-key-32bytes!!",
+        "pseudonym_key": "test-deterministic-key-32bytes!X",
     }
     response1 = client.post("/compliance/iso25237/pseudonymize", json=payload)
     response2 = client.post("/compliance/iso25237/pseudonymize", json=payload)
@@ -66,7 +66,7 @@ def test_pseudonymize_token_format(client):
 def test_depseudonymize_roundtrip(client):
     """Pseudonymize then depseudonymize should restore the original identifier."""
     original_text = "Patient email: carol@hospital.org"
-    key = "roundtrip-test-key-32bytes!!!!!!"
+    key = "roundtrip-test-key-32bytes-xxxxx"
 
     # Pseudonymize
     pseudo_resp = client.post(
@@ -100,7 +100,7 @@ def test_pseudonymize_custom_key(client):
     )
     response_custom = client.post(
         "/compliance/iso25237/pseudonymize",
-        json={"text": text, "language": language, "pseudonym_key": "custom-key-totally-different!"},
+        json={"text": text, "language": language, "pseudonym_key": "custom-key-totally-different-32!"},
     )
 
     assert response_default.status_code == 200
