@@ -220,7 +220,92 @@ curl -X POST http://localhost:8000/anonymize \
 
 ---
 
-Environment variables (override in `docker-compose.yml` or your shell):
+## Compliance frameworks
+
+The platform includes pre-built compliance profiles accessible under the `/compliance` prefix.
+
+### Supported frameworks
+
+| Framework | ID | Endpoint | Description |
+|-----------|----|---------|-----------  |
+| HIPAA Safe Harbor | `hipaa-safe-harbor` | `POST /compliance/hipaa/safe-harbor` | Removes all 18 PHI categories (45 CFR §164.514(b)(2)) |
+| HIPAA Expert Determination | `hipaa-expert-determination` | `POST /compliance/hipaa/expert-determination` | Re-identification risk scoring (NIST SP 800-188) |
+| MINSAL Chile / Ley 19.628 | `minsal` | `POST /compliance/minsal` | Chilean clinical data anonymization |
+| ISO 25237 Pseudonymization | `iso-25237` | `POST /compliance/iso25237/pseudonymize` | Deterministic HMAC-SHA256 pseudonymization |
+| ISO 29101 Audit Trail | `iso-29101` | `GET /compliance/audit-log` | Audit trail of all PII operations |
+
+### Chilean clinical entities (MINSAL / Ley 19.628)
+
+| Entity | Standard | Description | Example |
+|--------|----------|-------------|---------|
+| `CL_RUT` | Ley 19.628 | Chilean national ID (RUT/RUN) | `12.345.678-9` |
+| `CL_PHONE_NUMBER` | E.164 | Chilean phone number | `+56912345678` |
+| `CL_FONASA_ISAPRE` | MINSAL | FONASA/ISAPRE beneficiary number | `FONASA-12345678` |
+| `CL_FICHA_CLINICA` | HL7 | Clinical record number | `HC-000456` |
+| `CL_POSTAL_CODE` | Chile Post | Chilean postal code (7 digits) | `8320000` |
+| `CL_REGION` | ISO 3166-2:CL | Chilean administrative region | `Metropolitana` |
+
+### New environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_CLINICAL_CL` | `true` | Enable Chilean clinical recognizers (MINSAL / Ley 19.628) |
+| `PSEUDONYMIZATION_KEY` | `change-me-in-production-32bytes!` | HMAC key for ISO 25237 pseudonymization |
+| `ENABLE_AUDIT_LOG` | `true` | Enable ISO 29101 audit log |
+
+### Usage examples
+
+#### Anonymize a Chilean clinical note (MINSAL / Ley 19.628)
+
+```bash
+curl -X POST http://localhost:8000/compliance/minsal \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Paciente Juan Pérez, RUT 12.345.678-9, FONASA-12345678. Ficha: HC-000456. Tel: +56912345678.",
+    "language": "es"
+  }'
+```
+
+#### HIPAA Safe Harbor anonymization
+
+```bash
+curl -X POST http://localhost:8000/compliance/hipaa/safe-harbor \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Patient John Smith, SSN 078-05-1120, email john@example.com, IP 192.168.1.1.",
+    "language": "en"
+  }'
+```
+
+#### HIPAA Expert Determination (risk scoring)
+
+```bash
+curl -X POST http://localhost:8000/compliance/hipaa/expert-determination \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Patient Alice Johnson, SSN 078-05-1120, DOB 01/01/1980.",
+    "language": "en"
+  }'
+```
+
+#### ISO 25237 — Pseudonymize
+
+```bash
+curl -X POST http://localhost:8000/compliance/iso25237/pseudonymize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Contact me at alice@example.com.",
+    "language": "en"
+  }'
+```
+
+#### ISO 29101 — Audit log
+
+```bash
+curl http://localhost:8000/compliance/audit-log?limit=10
+```
+
+---
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -228,6 +313,9 @@ Environment variables (override in `docker-compose.yml` or your shell):
 | `DEFAULT_LANGUAGE` | `en` | BCP-47 language code |
 | `DEFAULT_SCORE_THRESHOLD` | `0.5` | Minimum confidence score |
 | `ENABLE_CLINICAL_ES` | `true` | Enable Spanish clinical recognizers (ISO/CIE-10/HL7) |
+| `ENABLE_CLINICAL_CL` | `true` | Enable Chilean clinical recognizers (MINSAL / Ley 19.628) |
+| `PSEUDONYMIZATION_KEY` | `change-me-in-production-32bytes!` | HMAC key for ISO 25237 pseudonymization |
+| `ENABLE_AUDIT_LOG` | `true` | Enable ISO 29101 audit log |
 
 ---
 
@@ -243,24 +331,33 @@ python -m pytest tests/ -v
 
 ```
 app/
-├── main.py                     # FastAPI application entry point
-├── config.py                   # Environment-based configuration
+├── main.py                         # FastAPI application entry point
+├── config.py                       # Environment-based configuration
 ├── routers/
-│   ├── analyze.py              # /analyze endpoints
-│   ├── anonymize.py            # /anonymize endpoints
-│   └── recognizers.py         # /recognizers endpoints
+│   ├── analyze.py                  # /analyze endpoints
+│   ├── anonymize.py                # /anonymize endpoints
+│   ├── compliance.py               # /compliance endpoints (HIPAA, MINSAL, ISO 25237/29101)
+│   └── recognizers.py              # /recognizers endpoints
 ├── models/
-│   ├── analyze.py              # Pydantic request/response models
+│   ├── analyze.py                  # Pydantic request/response models
 │   ├── anonymize.py
+│   ├── compliance.py               # Compliance framework models
 │   └── recognizer.py
 └── services/
-    ├── analyzer.py             # Presidio AnalyzerEngine wrapper (en + es)
-    ├── anonymizer.py           # Presidio AnonymizerEngine wrapper
+    ├── analyzer.py                 # Presidio AnalyzerEngine wrapper (en + es)
+    ├── anonymizer.py               # Presidio AnonymizerEngine wrapper
+    ├── audit_log.py                # ISO 29101 in-memory audit trail
+    ├── clinical_recognizers_cl.py  # Chilean clinical recognizers (MINSAL / Ley 19.628)
     ├── clinical_recognizers_es.py  # Spanish clinical recognizers (ISO/CIE-10/HL7)
-    └── recognizer_registry.py # Custom recognizer management
+    ├── pseudonymization.py         # ISO 25237 HMAC-SHA256 pseudonymization
+    ├── recognizer_registry.py      # Custom recognizer management
+    └── risk_scoring.py             # HIPAA Expert Determination risk scoring
 tests/
 ├── test_analyze.py
 ├── test_anonymize.py
-├── test_clinical_es.py         # Spanish clinical recognizer tests
+├── test_clinical_es.py             # Spanish clinical recognizer tests
+├── test_compliance_hipaa.py        # HIPAA Safe Harbor and Expert Determination tests
+├── test_compliance_minsal.py       # MINSAL Chile / Ley 19.628 tests
+├── test_pseudonymization.py        # ISO 25237 pseudonymization tests
 └── test_recognizers.py
 ```
