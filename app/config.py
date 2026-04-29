@@ -13,3 +13,12 @@ DEFAULT_SCORE_THRESHOLD: float = float(os.getenv("DEFAULT_SCORE_THRESHOLD", "0.5
 
 # Enable/disable Spanish clinical recognizers (ISO/CIE-10/HL7)
 ENABLE_CLINICAL_ES: bool = os.getenv("ENABLE_CLINICAL_ES", "true").lower() == "true"
+
+# Enable/disable Chilean clinical recognizers (MINSAL / Ley 19.628)
+ENABLE_CLINICAL_CL: bool = os.getenv("ENABLE_CLINICAL_CL", "true").lower() == "true"
+
+# HMAC key used for deterministic pseudonymization (ISO 25237)
+PSEUDONYMIZATION_KEY: str = os.getenv("PSEUDONYMIZATION_KEY", "change-me-in-production-32bytes!")
+
+# Enable/disable ISO 29101 audit log
+ENABLE_AUDIT_LOG: bool = os.getenv("ENABLE_AUDIT_LOG", "true").lower() == "true"
