@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config
-from app.routers import analyze, anonymize, compliance, recognizers
+from app.routers import analyze, anonymize, compliance, csv_upload, recognizers
 from app.services.clinical_recognizers_cl import register_clinical_recognizers_cl
 from app.services.clinical_recognizers_es import register_clinical_recognizers_es
 
@@ -90,6 +90,7 @@ app.include_router(analyze.router)
 app.include_router(anonymize.router)
 app.include_router(recognizers.router)
 app.include_router(compliance.router)
+app.include_router(csv_upload.router)
 
 
 @app.get("/", tags=["Health"])

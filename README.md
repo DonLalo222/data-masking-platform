@@ -337,11 +337,13 @@ app/
 │   ├── analyze.py                  # /analyze endpoints
 │   ├── anonymize.py                # /anonymize endpoints
 │   ├── compliance.py               # /compliance endpoints (HIPAA, MINSAL, ISO 25237/29101)
+│   ├── csv_upload.py               # /csv endpoints (batch CSV processing)
 │   └── recognizers.py              # /recognizers endpoints
 ├── models/
 │   ├── analyze.py                  # Pydantic request/response models
 │   ├── anonymize.py
 │   ├── compliance.py               # Compliance framework models
+│   ├── csv_processing.py           # CSV batch processing models
 │   └── recognizer.py
 └── services/
     ├── analyzer.py                 # Presidio AnalyzerEngine wrapper (en + es)
@@ -349,6 +351,7 @@ app/
     ├── audit_log.py                # ISO 29101 in-memory audit trail
     ├── clinical_recognizers_cl.py  # Chilean clinical recognizers (MINSAL / Ley 19.628)
     ├── clinical_recognizers_es.py  # Spanish clinical recognizers (ISO/CIE-10/HL7)
+    ├── csv_processor.py            # CSV batch processing service
     ├── pseudonymization.py         # ISO 25237 HMAC-SHA256 pseudonymization
     ├── recognizer_registry.py      # Custom recognizer management
     └── risk_scoring.py             # HIPAA Expert Determination risk scoring
@@ -358,6 +361,65 @@ tests/
 ├── test_clinical_es.py             # Spanish clinical recognizer tests
 ├── test_compliance_hipaa.py        # HIPAA Safe Harbor and Expert Determination tests
 ├── test_compliance_minsal.py       # MINSAL Chile / Ley 19.628 tests
+├── test_csv_upload.py              # CSV upload and batch processing tests
 ├── test_pseudonymization.py        # ISO 25237 pseudonymization tests
 └── test_recognizers.py
+frontend/
+├── src/
+│   ├── App.jsx                     # Main React application
+│   ├── api.js                      # API client module
+│   ├── main.jsx                    # React entry point
+│   └── index.css                   # Tailwind CSS imports
+├── index.html                      # Vite HTML entry point
+├── package.json
+├── vite.config.js                  # Vite config with /api proxy
+├── tailwind.config.js
+├── postcss.config.js
+└── Dockerfile
+```
+
+---
+
+## Frontend (PRISMA IA)
+
+A React + Tailwind CSS single-page application connected to the real API.
+
+### Development
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:3000
+```
+
+The Vite dev server proxies `/api/*` → `http://localhost:8000/*`, so no CORS issues during development.
+
+### With Docker
+
+```bash
+docker compose up --build
+# API:      http://localhost:8000
+# Frontend: http://localhost:3000
+```
+
+### CSV Upload
+
+`POST /csv/process` accepts `multipart/form-data`:
+- `file`: `.csv` file (max 10 MB)
+- `config`: JSON string with framework, language, text_columns
+
+```bash
+curl -X POST http://localhost:8000/csv/process \
+  -F "file=@patients.csv" \
+  -F 'config={"framework":"minsal","language":"es"}'
+```
+
+`POST /csv/process/download` returns the anonymized CSV as a file download:
+
+```bash
+curl -X POST http://localhost:8000/csv/process/download \
+  -F "file=@patients.csv" \
+  -F 'config={"framework":"hipaa","language":"es"}' \
+  -o anonymized_patients.csv
 ```
