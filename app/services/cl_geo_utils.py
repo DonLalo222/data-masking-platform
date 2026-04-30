@@ -43,10 +43,18 @@ def _load_chile_geo() -> dict:
 # ---------------------------------------------------------------------------
 
 def strip_accents(text: str) -> str:
-    """Return *text* with all accented characters replaced by their ASCII base
-    equivalents, lowercased.
+    """Normalise *text* for accent-insensitive matching.
 
-    The output is the same length as the input so offsets are preserved.
+    1. Decomposes accented characters via NFD (e.g. ``é`` → ``e`` + combining
+       acute accent).
+    2. Strips all Unicode combining marks (category ``Mn``).
+    3. Converts to lowercase.
+
+    Because each accented character decomposes into exactly one base character
+    plus one or more combining marks, stripping the combining marks produces a
+    string of the **same length** as the original NFC input.  Offsets into
+    the returned string therefore correspond 1-to-1 with offsets into the
+    original text.
     """
     nfd = unicodedata.normalize("NFD", text)
     return "".join(c for c in nfd if unicodedata.category(c) != "Mn").lower()
@@ -146,10 +154,13 @@ class ClAccentInsensitiveRecognizer(EntityRecognizer):
 
         # Pre-compile one regex per deny-list entry operating on normalised text.
         # Each tuple is (compiled_pattern, original_entry_for_explanation).
+        # re.IGNORECASE is intentionally kept for the accent_insensitive=False path,
+        # where text.lower() is used but the deny-list entry is user-supplied and
+        # may have mixed case.
         self._compiled: List[tuple] = []
         for entry in deny_list:
             normalised = strip_accents(entry) if accent_insensitive else entry.lower()
-            # \b anchors work correctly on ASCII-only normalised text.
+            # \b anchors work correctly on the lowercased / ASCII-normalised text.
             pattern = re.compile(
                 r"\b" + re.escape(normalised) + r"\b", re.IGNORECASE
             )

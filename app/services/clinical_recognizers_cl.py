@@ -245,6 +245,8 @@ def _build_recognizers() -> list:
                     # Prefix: Av., Avda., Avenida, Calle, Psje., Pasaje, Camino, Ruta, Paseo, Blvd.
                     # Street name: 1-4 words (letters, accented chars, hyphens, apostrophes)
                     # Optional number: N°123, No.456, #789, or bare 1-5 digit integer
+                    # Letter suffix (e.g. "45B") is optional to support depto/unit identifiers
+                    # common in Chilean addresses (e.g. "Calle Los Pinos 45B").
                     regex=(
                         r"(?i)\b"
                         r"(?:av\.?|avda?\.?|avenida|calle|psje\.?|pasaje|camino|ruta|paseo|blvd?\.?)"
