@@ -239,17 +239,43 @@ The platform includes pre-built compliance profiles accessible under the `/compl
 | Entity | Standard | Description | Example |
 |--------|----------|-------------|---------|
 | `CL_RUT` | Ley 19.628 | Chilean national ID (RUT/RUN) | `12.345.678-9` |
-| `CL_PHONE_NUMBER` | E.164 | Chilean phone number | `+56912345678` |
+| `CL_PHONE` | E.164 | Chilean phone number | `+56912345678` |
 | `CL_FONASA_ISAPRE` | MINSAL | FONASA/ISAPRE beneficiary number | `FONASA-12345678` |
 | `CL_FICHA_CLINICA` | HL7 | Clinical record number | `HC-000456` |
 | `CL_POSTAL_CODE` | Chile Post | Chilean postal code (7 digits) | `8320000` |
-| `CL_REGION` | ISO 3166-2:CL | Chilean administrative region | `Metropolitana` |
+| `CL_REGION` | ISO 3166-2:CL | Chilean administrative region (accent-insensitive) | `Biobío` / `Biobio` |
+| `CL_COMUNA` | SUBDERE | Chilean commune/municipality (accent-insensitive) | `Valparaíso` / `Valparaiso` |
+| `CL_STREET_ADDRESS` | — | Chilean street address with prefix abbreviations | `Av. Providencia 1234` |
 
-### New environment variables
+#### Accent-insensitive matching
+
+`CL_REGION` and `CL_COMUNA` use an accent-insensitive recognizer backed by the canonical commune list in `app/data/chile_communes.json`.  Both accented and non-accented variants are detected with identical confidence scores:
+
+| Input text | Detected as |
+|------------|-------------|
+| `Región del Biobío` | `CL_REGION` |
+| `Region del Biobio` | `CL_REGION` |
+| `REGION DE NUBLE` | `CL_REGION` |
+| `La comuna de Valparaíso` | `CL_COMUNA` |
+| `La comuna de Valparaiso` | `CL_COMUNA` |
+
+#### Street address detection
+
+`CL_STREET_ADDRESS` matches common Chilean street prefixes followed by a street name and optional number:
+
+| Supported prefixes | Number formats |
+|--------------------|----------------|
+| `Av.` / `Avda.` / `Avenida` | `N° 45` · `No. 8` · `#3` · `1234` |
+| `Calle` | |
+| `Pasaje` / `Psje.` | |
+| `Camino` / `Ruta` / `Paseo` | |
+
+### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ENABLE_CLINICAL_CL` | `true` | Enable Chilean clinical recognizers (MINSAL / Ley 19.628) |
+| `ENABLE_ACCENT_INSENSITIVE_MATCH` | `true` | Match `CL_REGION`/`CL_COMUNA` regardless of accent presence |
 | `PSEUDONYMIZATION_KEY` | `change-me-in-production-32bytes!` | HMAC key for ISO 25237 pseudonymization |
 | `ENABLE_AUDIT_LOG` | `true` | Enable ISO 29101 audit log |
 
@@ -264,6 +290,30 @@ curl -X POST http://localhost:8000/compliance/minsal \
     "text": "Paciente Juan Pérez, RUT 12.345.678-9, FONASA-12345678. Ficha: HC-000456. Tel: +56912345678.",
     "language": "es"
   }'
+```
+
+#### Detect Chilean regions with and without accents
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Region del Biobio", "language": "es", "entities": ["CL_REGION"]}'
+```
+
+#### Detect Chilean communes
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Domicilio en la comuna de Concepcion", "language": "es", "entities": ["CL_COMUNA"]}'
+```
+
+#### Detect a street address
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Av. Providencia 1234, Santiago", "language": "es", "entities": ["CL_STREET_ADDRESS"]}'
 ```
 
 #### HIPAA Safe Harbor anonymization
@@ -314,6 +364,7 @@ curl http://localhost:8000/compliance/audit-log?limit=10
 | `DEFAULT_SCORE_THRESHOLD` | `0.5` | Minimum confidence score |
 | `ENABLE_CLINICAL_ES` | `true` | Enable Spanish clinical recognizers (ISO/CIE-10/HL7) |
 | `ENABLE_CLINICAL_CL` | `true` | Enable Chilean clinical recognizers (MINSAL / Ley 19.628) |
+| `ENABLE_ACCENT_INSENSITIVE_MATCH` | `true` | Match CL_REGION/CL_COMUNA regardless of accents |
 | `PSEUDONYMIZATION_KEY` | `change-me-in-production-32bytes!` | HMAC key for ISO 25237 pseudonymization |
 | `ENABLE_AUDIT_LOG` | `true` | Enable ISO 29101 audit log |
 
@@ -349,15 +400,19 @@ app/
     ├── analyzer.py                 # Presidio AnalyzerEngine wrapper (en + es)
     ├── anonymizer.py               # Presidio AnonymizerEngine wrapper
     ├── audit_log.py                # ISO 29101 in-memory audit trail
+    ├── cl_geo_utils.py             # Accent-insensitive recognizer + region/commune lists
     ├── clinical_recognizers_cl.py  # Chilean clinical recognizers (MINSAL / Ley 19.628)
     ├── clinical_recognizers_es.py  # Spanish clinical recognizers (ISO/CIE-10/HL7)
     ├── csv_processor.py            # CSV batch processing service
     ├── pseudonymization.py         # ISO 25237 HMAC-SHA256 pseudonymization
     ├── recognizer_registry.py      # Custom recognizer management
     └── risk_scoring.py             # HIPAA Expert Determination risk scoring
+app/data/
+└── chile_communes.json             # Canonical Chilean regions + communes (SUBDERE/INE)
 tests/
 ├── test_analyze.py
 ├── test_anonymize.py
+├── test_clinical_cl_geo.py         # CL geographic entity tests (regions, communes, streets)
 ├── test_clinical_es.py             # Spanish clinical recognizer tests
 ├── test_compliance_hipaa.py        # HIPAA Safe Harbor and Expert Determination tests
 ├── test_compliance_minsal.py       # MINSAL Chile / Ley 19.628 tests

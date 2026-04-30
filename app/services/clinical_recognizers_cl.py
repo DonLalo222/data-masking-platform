@@ -5,7 +5,13 @@ from __future__ import annotations
 from presidio_analyzer import PatternRecognizer
 from presidio_analyzer.pattern import Pattern
 
+from app import config
 from app.services.analyzer import get_engine
+from app.services.cl_geo_utils import (
+    ClAccentInsensitiveRecognizer,
+    get_all_communes,
+    get_all_region_aliases,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -37,8 +43,8 @@ _CLINICAL_CONTEXT = [
 ]
 
 
-def _build_recognizers() -> list[PatternRecognizer]:
-    """Return fresh PatternRecognizer instances for all Chilean clinical entities."""
+def _build_recognizers() -> list:
+    """Return fresh recognizer instances for all Chilean clinical entities."""
     return [
         # RUT chileno — with dots (score 0.88) and without dots (score 0.82)
         PatternRecognizer(
@@ -141,36 +147,50 @@ def _build_recognizers() -> list[PatternRecognizer]:
             ],
             context=_CLINICAL_CONTEXT,
         ),
-        # Chilean regions — deny_list (all 16 regions)
-        PatternRecognizer(
+        # Chilean regions — accent-insensitive, all 16 regions with variants
+        # Handles accented forms (Biobío / Biobio, Ñuble / Nuble, etc.) and
+        # common abbreviations or alternate spellings from the canonical data file.
+        # base_score=1.0 matches the PatternRecognizer deny_list default so that
+        # CL_REGION takes precedence over generic LOCATION entities when both
+        # are detected for the same span.
+        ClAccentInsensitiveRecognizer(
             supported_entity="CL_REGION",
             name="ClRegionRecognizer",
-            supported_language="es",
-            deny_list=[
-                "Arica y Parinacota",
-                "Tarapacá",
-                "Antofagasta",
-                "Atacama",
-                "Coquimbo",
-                "Valparaíso",
-                "Metropolitana",
-                "O'Higgins",
-                "Maule",
-                "Ñuble",
-                "Biobío",
-                "La Araucanía",
-                "Los Ríos",
-                "Los Lagos",
-                "Aysén",
-                "Magallanes",
-            ],
+            deny_list=get_all_region_aliases(),
             context=[
                 "región",
+                "region",
                 "provincia",
                 "comuna",
                 "localidad",
                 "domicilio",
+                "dirección",
+                "direccion",
             ],
+            base_score=1.0,
+            accent_insensitive=config.ENABLE_ACCENT_INSENSITIVE_MATCH,
+        ),
+        # Chilean communes — accent-insensitive, all 346 official communes
+        # Boosted by geographic/address context words to reduce false positives.
+        ClAccentInsensitiveRecognizer(
+            supported_entity="CL_COMUNA",
+            name="ClComunaRecognizer",
+            deny_list=get_all_communes(),
+            context=[
+                "comuna",
+                "municipio",
+                "localidad",
+                "sector",
+                "domicilio",
+                "dirección",
+                "direccion",
+                "calle",
+                "avenida",
+                "región",
+                "region",
+            ],
+            base_score=0.75,
+            accent_insensitive=config.ENABLE_ACCENT_INSENSITIVE_MATCH,
         ),
         # Chilean phone numbers — E.164 / ITU-T
         # Matches numbers with optional +56/0056/56 country code followed by a
@@ -208,6 +228,62 @@ def _build_recognizers() -> list[PatternRecognizer]:
                 "domicilio",
                 "región",
                 "comuna",
+            ],
+        ),
+        # Chilean street addresses — pattern recognizer covering common prefixes:
+        #   Av. / Avda. / Avenida / Calle / Psje. / Pasaje / Camino / Ruta
+        # followed by 1–4 words for the street name and an optional number
+        # (with N°, No., # or plain integer variants).  Relies on address
+        # context words for score boost.
+        PatternRecognizer(
+            supported_entity="CL_STREET_ADDRESS",
+            name="ClStreetAddressRecognizer",
+            supported_language="es",
+            patterns=[
+                Pattern(
+                    name="CL_STREET_ADDRESS_full",
+                    # Prefix: Av., Avda., Avenida, Calle, Psje., Pasaje, Camino, Ruta, Paseo, Blvd.
+                    # Street name: 1-4 words (letters, accented chars, hyphens, apostrophes)
+                    # Optional number: N°123, No.456, #789, or bare 1-5 digit integer
+                    # Letter suffix (e.g. "45B") is optional to support depto/unit identifiers
+                    # common in Chilean addresses (e.g. "Calle Los Pinos 45B").
+                    regex=(
+                        r"(?i)\b"
+                        r"(?:av\.?|avda?\.?|avenida|calle|psje\.?|pasaje|camino|ruta|paseo|blvd?\.?)"
+                        r"\s+"
+                        r"(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ][a-záéíóúñüA-ZÁÉÍÓÚÑÜ0-9\-\'\.]*"
+                        r"(?:\s+[a-záéíóúñüA-ZÁÉÍÓÚÑÜ][a-záéíóúñüA-ZÁÉÍÓÚÑÜ0-9\-\'\.]*){0,4})"
+                        r"(?:\s+(?:N°|No\.?|#|nro\.?)\s*\d{1,5}[a-zA-Z]?"
+                        r"|\s+\d{1,5}[a-zA-Z]?)?"
+                    ),
+                    score=0.80,
+                ),
+                Pattern(
+                    name="CL_STREET_ADDRESS_number_only",
+                    # Pattern that captures just a numbered address after a known prefix
+                    # used as a complement to the full pattern above.
+                    regex=(
+                        r"(?i)\b"
+                        r"(?:av\.?|avda?\.?|avenida|calle|psje\.?|pasaje|camino|ruta|paseo)"
+                        r"\s+\d{1,5}\b"
+                    ),
+                    score=0.65,
+                ),
+            ],
+            context=[
+                "dirección",
+                "direccion",
+                "domicilio",
+                "calle",
+                "avenida",
+                "av",
+                "número",
+                "numero",
+                "depto",
+                "departamento",
+                "casa",
+                "piso",
+                "bloque",
             ],
         ),
     ]
