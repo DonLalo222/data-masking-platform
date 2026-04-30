@@ -70,6 +70,8 @@ MINSAL_ENTITIES: List[str] = [
     # Datos de contacto/ubicación
     "CL_PHONE",
     "CL_REGION",
+    "CL_COMUNA",
+    "CL_STREET_ADDRESS",
     # Entidades genéricas de Presidio
     "PERSON",
     "EMAIL_ADDRESS",
@@ -109,6 +111,11 @@ _MINSAL_OPERATORS: Dict[str, dict] = {
     "PHONE_NUMBER": {"type": "mask", "params": {"masking_char": "*", "chars_to_mask": 6, "from_end": True}},
     # Región: conservar (dato geográfico agregado, no re-identificador)
     "CL_REGION": {"type": "keep"},
+    # Comuna: conservar (dato geográfico de nivel 2; se anonimiza si hay riesgo
+    # alto, pero se conserva por defecto para contexto epidemiológico)
+    "CL_COMUNA": {"type": "keep"},
+    # Dirección de calle: reemplazar (identificador de ubicación precisa)
+    "CL_STREET_ADDRESS": {"type": "replace", "params": {"new_value": "<DOMICILIO>"}},
     # Persona: reemplazar
     "PERSON": {"type": "replace", "params": {"new_value": "<PACIENTE>"}},
     # Email: eliminar completamente
